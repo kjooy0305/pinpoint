@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>떨어지는 모래 — 테스트 30</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;background:#1a1a2e;}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;
+     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;user-select:none;}
+
+#title{color:#e2c97e;font-size:15px;font-weight:700;letter-spacing:2px;margin-bottom:6px;
+       text-shadow:0 0 10px rgba(226,201,126,.4);}
+
+#canvas-wrap{position:relative;border:2px solid #3a3a5c;border-radius:4px;overflow:hidden;
+             box-shadow:0 0 30px rgba(0,0,0,.6);}
+#canvas{display:block;cursor:crosshair;}
+
+#floor-open-line{position:absolute;bottom:0;left:0;right:0;height:4px;
+  background:rgba(255,80,80,0);transition:background .15s;pointer-events:none;}
+#canvas-wrap.floor-open #floor-open-line{background:rgba(255,80,80,.7);box-shadow:0 0 8px rgba(255,80,80,.5);}
+
+#controls{
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px;
+  margin-top:6px;padding:7px 11px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+  border-radius:8px;width:100%;max-width:700px;
+}
+.ctrl-row{
+  width:100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px;
+  padding-top:5px;border-top:1px solid rgba(255,255,255,.08);
+}
+.ctrl-group{display:flex;align-items:center;gap:4px;}
+.ctrl-label{color:#a0a0c0;font-size:12px;white-space:nowrap;}
+.ctrl-divider{width:1px;height:22px;background:rgba(255,255,255,.1);}
+
+input[type=range]{
+  -webkit-appearance:none;appearance:none;height:4px;border-radius:2px;
+  background:rgba(255,255,255,.15);outline:none;cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+  background:#e2c97e;cursor:pointer;
+}
+.val-display{color:#e2c97e;font-size:11px;min-width:26px;text-align:center;}
+
+.btn{padding:5px 10px;border:none;border-radius:5px;font-size:11px;font-weight:600;
+     cursor:pointer;transition:all .12s;letter-spacing:.3px;}
+#btn-floor{background:#3a1a1a;color:#ff6b6b;border:1px solid #ff4444;}
+#btn-floor.held{background:#5a1a1a;box-shadow:0 0 10px rgba(255,68,68,.4);}
+#btn-spawn{background:#1a3a1a;color:#6bff6b;border:1px solid #44ff44;}
+#btn-clear{background:#1a1a3a;color:#6b9bff;border:1px solid #4466ff;}
+#btn-fs  {background:#1a2a2a;color:#80d0d0;border:1px solid #406060;}
+
+#btn-auto{background:#1a0a2e;color:#c084fc;border:1px solid #9955cc;}
+#btn-auto.auto-active{color:#fff;border-color:transparent;animation:rb-glow 2s linear infinite;}
+@keyframes rb-glow{
+  0%{box-shadow:0 0 10px #ff6b6b;} 17%{box-shadow:0 0 10px #ffaa44;}
+  33%{box-shadow:0 0 10px #eeee44;} 50%{box-shadow:0 0 10px #44ff88;}
+  67%{box-shadow:0 0 10px #44aaff;} 83%{box-shadow:0 0 10px #cc66ff;}
+  100%{box-shadow:0 0 10px #ff6b6b;}
+}
+
+#btn-autoreset{background:#2a1a0a;color:#f0a060;border:1px solid #a06030;}
+#btn-autoreset.on{background:#3a2000;color:#ffcc88;border-color:#ffaa44;
+  box-shadow:0 0 8px rgba(255,170,68,.3);}
+#btn-countdown{background:#1a1a2a;color:#8888cc;border:1px solid #445588;}
+#btn-countdown.on{background:#1a1a3a;color:#aaaaff;border-color:#6688ff;
+  box-shadow:0 0 6px rgba(100,136,255,.3);}
+
+.color-pick{display:flex;gap:3px;align-items:center;}
+.color-swatch{width:14px;height:14px;border-radius:3px;cursor:pointer;
+  border:2px solid transparent;transition:.1s;}
+.color-swatch.active{border-color:#fff;box-shadow:0 0 4px rgba(255,255,255,.5);}
+
+.theme-btn{padding:3px 7px;border:1px solid rgba(255,255,255,.14);border-radius:4px;
+  background:rgba(255,255,255,.04);color:#909090;font-size:11px;cursor:pointer;transition:.1s;}
+.theme-btn:hover{background:rgba(255,255,255,.1);color:#ccc;}
+.theme-btn.active{background:rgba(255,255,255,.16);color:#fff;border-color:rgba(255,255,255,.35);}
+
+#custom-row{width:100%;display:none;align-items:flex-end;flex-wrap:wrap;gap:6px;
+  padding-top:5px;border-top:1px solid rgba(255,255,255,.08);}
+#custom-row.visible{display:flex;}
+.cpick-item{display:flex;flex-direction:column;align-items:center;gap:2px;}
+.cpick-idx{font-size:9px;color:#606080;}
+.cpick-inp{width:22px;height:22px;border:2px solid rgba(255,255,255,.25);
+  border-radius:3px;cursor:pointer;padding:1px;background:none;}
+.cpick-inp:hover{border-color:rgba(255,255,255,.6);}
+.cpick-del{width:22px;height:14px;border:none;border-radius:2px;
+  background:rgba(255,80,80,.18);color:#ff8888;font-size:10px;cursor:pointer;
+  line-height:1;transition:.1s;}
+.cpick-del:hover{background:rgba(255,80,80,.45);color:#fff;}
+.cpick-add{width:22px;height:58px;border:1px dashed rgba(100,200,100,.35);border-radius:3px;
+  background:rgba(100,200,100,.07);color:#88cc88;font-size:18px;cursor:pointer;
+  line-height:1;transition:.1s;}
+.cpick-add:hover{background:rgba(100,200,100,.2);color:#aaffaa;}
+
+#stats{color:#606080;font-size:11px;margin-left:auto;}
+
+/* 전체화면 — 컨트롤·타이틀 완전 숨김, 플로팅 버튼 없음 */
+body.fs-mode #title   {display:none;}
+body.fs-mode #controls{display:none;}
+body.fs-mode #canvas-wrap{
+  position:fixed;top:50%;left:50%;transform-origin:center center;
+  z-index:999;border:none;border-radius:0;box-shadow:none;
+}
+</style>
+</head>
+<body>
+
+<div id="title">SAND SIMULATION</div>
+
+<div id="canvas-wrap">
+  <canvas id="canvas"></canvas>
+  <div id="floor-open-line"></div>
+</div>
+
+<div id="controls">
+
+  <!-- 행 1: 기본 -->
+  <div class="ctrl-group">
+    <button class="btn" id="btn-floor">밑 열기 (꾹)</button>
+  </div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">밀도</span>
+    <input type="range" id="slider-density" min="1" max="10" value="5" step="1" style="width:60px">
+    <span class="val-display" id="val-density">5</span>
+  </div>
+  <div class="ctrl-group">
+    <span class="ctrl-label">양</span>
+    <input type="range" id="slider-amount" min="1" max="500" value="80" step="1" style="width:70px">
+    <span class="val-display" id="val-amount">8.0</span>
+  </div>
+  <div class="ctrl-group color-pick" id="color-pick"></div>
+  <div class="ctrl-group">
+    <button class="btn" id="btn-spawn">소환</button>
+  </div>
+  <div class="ctrl-group">
+    <button class="btn" id="btn-clear">초기화</button>
+  </div>
+  <div class="ctrl-group">
+    <button class="btn" id="btn-fs">⛶ 전체화면</button>
+  </div>
+  <span id="stats">모래: 0</span>
+
+  <!-- 행 2: 자동 산 + 테마 + 음량 -->
+  <div class="ctrl-row">
+    <div class="ctrl-group">
+      <button class="btn" id="btn-auto">⛰ 자동 산 OFF</button>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">봉우리</span>
+      <input type="range" id="slider-peaks" min="1" max="20" value="6" step="1" style="width:60px">
+      <span class="val-display" id="val-peaks">6</span>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">속도</span>
+      <input type="range" id="slider-speed" min="1" max="10" value="6" step="1" style="width:55px">
+      <span class="val-display" id="val-speed">6</span>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">폭</span>
+      <input type="range" id="slider-spread" min="0" max="20" value="2" step="1" style="width:55px">
+      <span class="val-display" id="val-spread">2</span>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">🔊</span>
+      <input type="range" id="slider-vol" min="0" max="100" value="50" step="1" style="width:55px">
+    </div>
+    <div class="ctrl-divider"></div>
+    <button class="theme-btn active" data-theme="forest">🌲 초록</button>
+    <button class="theme-btn"        data-theme="autumn">🍂 단풍</button>
+    <button class="theme-btn"        data-theme="winter">❄️ 겨울</button>
+    <button class="theme-btn"        data-theme="desert">🏜 사막</button>
+    <button class="theme-btn"        data-theme="volcano">🌋 화산</button>
+    <button class="theme-btn"        data-theme="rainbow">🌈 무지개</button>
+    <button class="theme-btn"        data-theme="custom">🎨 커스텀</button>
+  </div>
+
+  <!-- 행 3: 커스텀 색상 -->
+  <div id="custom-row">
+    <span class="ctrl-label" style="align-self:flex-end;margin-bottom:4px;">색상</span>
+    <div id="cpick-container" style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;"></div>
+  </div>
+
+  <!-- 행 4: 자동 초기화 -->
+  <div class="ctrl-row">
+    <div class="ctrl-group">
+      <button class="btn" id="btn-autoreset">🔄 자동초기화 OFF</button>
+    </div>
+    <div class="ctrl-group">
+      <button class="btn on" id="btn-countdown">💬 메시지 표시 ON</button>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">대기</span>
+      <input type="range" id="slider-delay" min="1" max="30" value="5" step="1" style="width:65px">
+      <span class="val-display" id="val-delay">5s</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  캔버스
+// ═══════════════════════════════════════════
+const canvas  = document.getElementById('canvas');
+const ctx     = canvas.getContext('2d');
+const canWrap = document.getElementById('canvas-wrap');
+const CELL    = 4;
+let COLS, ROWS, grid, imageData, pixels;
+
+function resize(){
+  const isFS = !!document.fullscreenElement;
+  const W = isFS ? window.innerWidth  : Math.min(window.innerWidth  - 20, 700);
+  const H = isFS ? window.innerHeight : Math.min(window.innerHeight - 188, 450);
+  const newW=Math.floor(Math.max(W,100)/CELL)*CELL;
+  const newH=Math.floor(Math.max(H,100)/CELL)*CELL;
+  if(canvas.width===newW && canvas.height===newH) return; // 크기 변화 없으면 그대로
+  const oldGrid=grid, oldCols=COLS, oldRows=ROWS;
+  canvas.width=newW; canvas.height=newH;
+  canWrap.style.width=newW+'px'; canWrap.style.height=newH+'px';
+  COLS=newW/CELL; ROWS=newH/CELL;
+  grid=new Uint32Array(COLS*ROWS);
+  imageData=ctx.createImageData(newW,newH);
+  pixels=imageData.data;
+  // 기존 그리드 데이터를 새 크기에 비례 복사 (초기화 방지)
+  if(oldGrid&&oldCols&&oldRows){
+    for(let y=0;y<ROWS;y++){
+      const oy=Math.floor(y/ROWS*oldRows);
+      for(let x=0;x<COLS;x++){
+        grid[y*COLS+x]=oldGrid[oy*oldCols+Math.floor(x/COLS*oldCols)];
+      }
+    }
+  }
+}
+
+// ═══════════════════════════════════════════
+//  전체화면 (플로팅 버튼 없음 — ESC로 탈출)
+// ═══════════════════════════════════════════
+const btnFS=document.getElementById('btn-fs');
+btnFS.addEventListener('click',()=>{
+  if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+  else document.exitFullscreen();
+});
+let fsTransition=false;
+document.addEventListener('fullscreenchange',()=>{
+  const isFS=!!document.fullscreenElement;
+  document.body.classList.toggle('fs-mode',isFS);
+  btnFS.textContent=isFS?'⛶ 창모드':'⛶ 전체화면';
+  if(isFS){
+    const sx=window.innerWidth/canWrap.offsetWidth;
+    const sy=window.innerHeight/canWrap.offsetHeight;
+    canWrap.style.transform=`translate(-50%,-50%) scale(${sx},${sy})`;
+  } else {
+    fsTransition=true;
+    canWrap.style.transform='';
+    setTimeout(()=>fsTransition=false, 300);
+  }
+});
+
+// ═══════════════════════════════════════════
+//  색상 유틸
+// ═══════════════════════════════════════════
+function hexToRgb(h){return{r:parseInt(h.slice(1,3),16),g:parseInt(h.slice(3,5),16),b:parseInt(h.slice(5,7),16)};}
+function hslToRgb(h,s,l){
+  s/=100;l/=100;
+  const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));
+  return{r:(f(0)*255)|0,g:(f(8)*255)|0,b:(f(4)*255)|0};
+}
+function packColor(r,g,b){return(0xFF<<24)|(b<<16)|(g<<8)|r;}
+function clamp(v){return Math.min(255,Math.max(0,v));}
+function vary(c,a=18){const v=(Math.random()*a*2-a)|0;return{r:clamp(c.r+v),g:clamp(c.g+v),b:clamp(c.b+v)};}
+
+// ═══════════════════════════════════════════
+//  수동 팔레트
+// ═══════════════════════════════════════════
+const PALETTES=[
+  {name:'모래',color:'#d4a853'},{name:'백모래',color:'#e8ddb5'},
+  {name:'적모래',color:'#c0533a'},{name:'흑모래',color:'#3a3028'},
+  {name:'파란',color:'#5588cc'},{name:'초록',color:'#5aaa55'},
+  {name:'보라',color:'#9955cc'},{name:'무지개',color:'rainbow'},
+];
+let currentPalette=0;
+function getSandColor(x){
+  const p=PALETTES[currentPalette];
+  if(p.color==='rainbow') return hslToRgb((x/COLS*360+Date.now()*.05)%360,80,60);
+  return vary(hexToRgb(p.color));
+}
+const colorPick=document.getElementById('color-pick');
+PALETTES.forEach((p,i)=>{
+  const sw=document.createElement('div');
+  sw.className='color-swatch'+(i===0?' active':'');
+  sw.title=p.name;
+  sw.style.background=p.color==='rainbow'?'linear-gradient(90deg,red,orange,yellow,green,blue,violet)':p.color;
+  sw.addEventListener('click',()=>{
+    currentPalette=i;
+    document.querySelectorAll('.color-swatch').forEach((s,j)=>s.classList.toggle('active',j===i));
+  });
+  colorPick.appendChild(sw);
+});
+
+// ═══════════════════════════════════════════
+//  산 테마
+// ═══════════════════════════════════════════
+const THEMES={
+  forest: ['#0b380a','#196012','#2a8020','#3aa030','#52c040','#6add50','#488a28','#80e060'],
+  autumn: ['#7a1000','#aa2000','#d83800','#f05000','#f07800','#e09800','#c87000','#902800'],
+  winter: ['#eef4ff','#c0d8f4','#88b8e8','#5098d4','#1870bc','#80b4e0','#d0e8ff','#4080c0'],
+  desert: ['#b47c10','#cc9820','#e0b430','#f0ca40','#d09020','#a46c08','#e8a420','#c87c10'],
+  volcano:['#050000','#250000','#540000','#8c0800','#c81800','#f02400','#ff4800','#b01400'],
+  rainbow:null, custom:null,
+};
+let currentTheme='forest';
+let customColors=['#e04040','#e08844','#d4c040','#40b060','#4488e0'];
+
+function getThemePal(){
+  if(currentTheme==='rainbow') return null;
+  if(currentTheme==='custom')  return customColors.length?customColors:['#ffffff'];
+  return THEMES[currentTheme];
+}
+function getEmitterColor(em,x){
+  if(currentTheme==='rainbow') return hslToRgb((x/COLS*360)%360,88,58);
+  const pal=getThemePal();
+  return vary(hexToRgb(pal[em.ci%pal.length]),16);
+}
+function indicatorHex(em){
+  if(currentTheme==='rainbow') return `hsl(${(em.x/COLS*360)%360},90%,70%)`;
+  const pal=getThemePal();
+  return pal[em.ci%pal.length];
+}
+
+// 테마 버튼
+document.querySelectorAll('.theme-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    currentTheme=btn.dataset.theme;
+    document.querySelectorAll('.theme-btn').forEach(b=>b.classList.toggle('active',b===btn));
+    const isC=currentTheme==='custom';
+    document.getElementById('custom-row').classList.toggle('visible',isC);
+    if(isC) buildCustomPickers();
+    if(autoMode) rebuildEmitters();
+    if(autoMode) Ambient.changeTheme(currentTheme);
+  });
+});
+
+// 커스텀 색상 (동적)
+function buildCustomPickers(){
+  const c=document.getElementById('cpick-container');
+  c.innerHTML='';
+  customColors.forEach((color,i)=>{
+    const item=document.createElement('div'); item.className='cpick-item';
+    const lbl=document.createElement('span'); lbl.className='cpick-idx'; lbl.textContent=i+1;
+    const inp=document.createElement('input'); inp.type='color'; inp.className='cpick-inp'; inp.value=color;
+    const ii=i; inp.addEventListener('input',e=>customColors[ii]=e.target.value);
+    const del=document.createElement('button'); del.className='cpick-del'; del.textContent='✕';
+    del.addEventListener('click',()=>{
+      if(customColors.length<=1)return;
+      customColors.splice(ii,1); buildCustomPickers();
+      if(autoMode) rebuildEmitters();
+    });
+    item.appendChild(lbl); item.appendChild(inp); item.appendChild(del);
+    c.appendChild(item);
+  });
+  const addBtn=document.createElement('button'); addBtn.className='cpick-add'; addBtn.textContent='+';
+  addBtn.addEventListener('click',()=>{
+    const rh=Math.random()*360;
+    const rgb=hslToRgb(rh,75,55);
+    customColors.push('#'+[rgb.r,rgb.g,rgb.b].map(v=>v.toString(16).padStart(2,'0')).join(''));
+    buildCustomPickers();
+    if(autoMode) rebuildEmitters();
+  });
+  c.appendChild(addBtn);
+}
+
+// ═══════════════════════════════════════════
+//  앰비언트 사운드 엔진 (노이즈 기반 자연음)
+// ═══════════════════════════════════════════
+const Ambient = (() => {
+  let actx=null, master=null;
+  let active=false, theme=null;
+  let nodes=[], gen=0;
+  let vol=0.5;
+
+  // 루프용 화이트 노이즈 버퍼 소스
+  function mkNoise(sec){
+    const len=actx.sampleRate*sec;
+    const buf=actx.createBuffer(1,len,actx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+    const src=actx.createBufferSource(); src.buffer=buf; src.loop=true;
+    return src;
+  }
+
+  // 밴드패스 필터 노이즈 + LFO 바람 레이어
+  function makeWind(fC,q,lfoHz,lfoDepth,gainVal){
+    const ns=mkNoise(4);
+    const bp=actx.createBiquadFilter();
+    bp.type='bandpass'; bp.frequency.value=fC; bp.Q.value=q;
+    const lfo=actx.createOscillator();
+    lfo.type='sine'; lfo.frequency.value=lfoHz;
+    const lfoG=actx.createGain(); lfoG.gain.value=lfoDepth;
+    lfo.connect(lfoG); lfoG.connect(bp.frequency); lfo.start();
+    const g=actx.createGain(); g.gain.value=0;
+    g.gain.setTargetAtTime(gainVal,actx.currentTime,2.5);
+    ns.connect(bp); bp.connect(g); g.connect(master); ns.start();
+    nodes.push({ns,lfo,g});
+  }
+
+  // 단순 필터 노이즈 레이어
+  function makeNoise(ftype,fCut,q,gainVal){
+    const ns=mkNoise(3);
+    const f=actx.createBiquadFilter();
+    f.type=ftype; f.frequency.value=fCut; f.Q.value=q;
+    const g=actx.createGain(); g.gain.value=0;
+    g.gain.setTargetAtTime(gainVal,actx.currentTime,2);
+    ns.connect(f); f.connect(g); g.connect(master); ns.start();
+    nodes.push({ns,g});
+  }
+
+  // 저주파 드론 오실레이터 (배경 깊이감)
+  function makeDrone(freq,gainVal,wave='sine'){
+    const osc=actx.createOscillator();
+    osc.type=wave; osc.frequency.value=freq;
+    const g=actx.createGain(); g.gain.value=0;
+    g.gain.setTargetAtTime(gainVal,actx.currentTime,3);
+    osc.connect(g); g.connect(master); osc.start();
+    nodes.push({osc,g});
+  }
+
+  // 새 울음: 오실레이터 주파수 스윕
+  function bird(){
+    const t=actx.currentTime;
+    const n=1+Math.floor(Math.random()*4);
+    for(let i=0;i<n;i++){
+      const delay=i*(.08+Math.random()*.14);
+      const f0=2400+Math.random()*2000;
+      const f1=f0+300+Math.random()*900;
+      const dur=.07+Math.random()*.16;
+      const osc=actx.createOscillator(), g=actx.createGain();
+      osc.type='sine';
+      osc.frequency.setValueAtTime(f0,t+delay);
+      osc.frequency.linearRampToValueAtTime(f1,t+delay+dur*.4);
+      osc.frequency.linearRampToValueAtTime(f0*.82,t+delay+dur);
+      g.gain.setValueAtTime(0,t+delay);
+      g.gain.linearRampToValueAtTime(.065,t+delay+.008);
+      g.gain.exponentialRampToValueAtTime(.001,t+delay+dur);
+      osc.connect(g); g.connect(master);
+      osc.start(t+delay); osc.stop(t+delay+dur+.05);
+    }
+  }
+
+  // 낙엽/눈 밟는 소리: 짧은 노이즈 버스트
+  function crunch(isSnow,lvl){
+    lvl=lvl||.24;
+    const dur=isSnow?.08:.15+Math.random()*.05;
+    const fC=isSnow?3500+Math.random()*3000:1000+Math.random()*2500;
+    const len=(actx.sampleRate*dur)|0;
+    const buf=actx.createBuffer(1,len,actx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2);
+    const src=actx.createBufferSource(); src.buffer=buf;
+    const f=actx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=fC; f.Q.value=3;
+    const g=actx.createGain(); g.gain.value=lvl*(.6+Math.random()*.8);
+    src.connect(f); f.connect(g); g.connect(master); src.start();
+  }
+
+  // 바람 휘파람 (사막/겨울): 사인 주파수 스윕
+  function whistle(fMin,fMax){
+    const t=actx.currentTime;
+    const dur=.35+Math.random()*1.1;
+    const f0=fMin+Math.random()*(fMax-fMin);
+    const fP=f0+250+Math.random()*500;
+    const osc=actx.createOscillator(), g=actx.createGain();
+    osc.type='sine';
+    osc.frequency.setValueAtTime(f0,t);
+    osc.frequency.linearRampToValueAtTime(fP,t+dur*.35);
+    osc.frequency.linearRampToValueAtTime(f0*.62,t+dur);
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(.03+Math.random()*.03,t+dur*.08);
+    g.gain.exponentialRampToValueAtTime(.001,t+dur);
+    osc.connect(g); g.connect(master);
+    osc.start(t); osc.stop(t+dur+.1);
+  }
+
+  // 화산 탁탁 소리: 노이즈 버스트
+  function crackle(){
+    const dur=.04+Math.random()*.13;
+    const len=(actx.sampleRate*dur)|0;
+    const buf=actx.createBuffer(1,len,actx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3);
+    const src=actx.createBufferSource(); src.buffer=buf;
+    const f=actx.createBiquadFilter(); f.type='bandpass';
+    f.frequency.value=120+Math.random()*700; f.Q.value=.7;
+    const g=actx.createGain(); g.gain.value=.22+Math.random()*.32;
+    src.connect(f); f.connect(g); g.connect(master); src.start();
+  }
+
+  // 테마별 지속 레이어 시작
+  function startLayers(t){
+    switch(t){
+      case 'forest':
+        makeWind(360,.55,.07,220,.13);      // 숲 저음 바람
+        makeWind(1150,1.8,.17,380,.065);    // 나뭇잎 스침 소리
+        makeNoise('lowpass',120,1,.04);     // 나무 울림
+        break;
+      case 'autumn':
+        makeWind(580,.42,.13,310,.14);      // 건조한 가을바람
+        makeWind(1700,2.6,.24,520,.055);    // 마른 잎 스침
+        makeNoise('highpass',3800,.7,.022); // 마른잎 하이스
+        break;
+      case 'winter':
+        makeWind(1900,.95,.055,650,.125);   // 차가운 고음 바람
+        makeWind(380,.28,.04,130,.055);     // 깊은 차가운 바람
+        makeDrone(55,.04);                  // 겨울 저음
+        break;
+      case 'desert':
+        makeWind(720,.38,.11,290,.17);      // 뜨거운 사막 바람
+        makeNoise('highpass',5500,.5,.018); // 모래 쉬익
+        makeDrone(82,.05,'sine');           // 사막 드론
+        break;
+      case 'volcano':
+        makeNoise('lowpass',55,.9,.17);     // 심층 지진 울림
+        makeNoise('lowpass',110,1,.09);     // 중저 울림
+        makeNoise('highpass',2800,.5,.045); // 증기 쉬익
+        makeDrone(40,.11,'sawtooth');       // 화산 저음 드론
+        break;
+      case 'rainbow':
+        makeWind(950,.75,.21,240,.08);      // 산들바람
+        makeNoise('bandpass',2200,2,.025);  // 공기 반짝임
+        break;
+      default:
+        makeWind(470,.58,.10,200,.10);      // 중립 바람
+        break;
+    }
+  }
+
+  // 테마별 랜덤 이벤트 정의 (minD~maxD ms 간격으로 반복)
+  const EVTS={
+    forest:[
+      {fn:()=>bird(),            minD:5000, maxD:12000},
+      {fn:()=>crunch(false,.14), minD:1800, maxD:4800},
+    ],
+    autumn:[
+      {fn:()=>crunch(false,.34), minD:700,  maxD:2800},
+      {fn:()=>crunch(false,.26), minD:1100, maxD:3800},
+      {fn:()=>bird(),            minD:9000, maxD:22000},
+    ],
+    winter:[
+      {fn:()=>crunch(true,.32),  minD:2500, maxD:7000},
+      {fn:()=>whistle(1600,3000),minD:4000, maxD:10000},
+    ],
+    desert:[
+      {fn:()=>whistle(650,1050), minD:3500, maxD:9500},
+    ],
+    volcano:[
+      {fn:()=>crackle(),         minD:280,  maxD:1400},
+      {fn:()=>crackle(),         minD:500,  maxD:2200},
+    ],
+    rainbow:[
+      {fn:()=>bird(),            minD:2000, maxD:5000},
+      {fn:()=>bird(),            minD:3500, maxD:8000},
+    ],
+    custom:[
+      {fn:()=>bird(),            minD:6000, maxD:15000},
+      {fn:()=>crunch(false,.12), minD:3500, maxD:9000},
+    ],
+  };
+
+  // gen 체크로 테마 변경 시 이전 타이머 자동 종료
+  function sched(myGen){
+    if(!active||gen!==myGen) return;
+    const evts=EVTS[theme]||EVTS.custom;
+    evts.forEach(ev=>{
+      const fire=(g)=>{
+        if(!active||gen!==g) return;
+        ev.fn();
+        setTimeout(()=>fire(g), ev.minD+Math.random()*(ev.maxD-ev.minD));
+      };
+      setTimeout(()=>fire(myGen), Math.random()*ev.minD*.8);
+    });
+  }
+
+  function stopAll(){
+    const now=actx?actx.currentTime:0;
+    nodes.forEach(n=>{
+      try{n.g.gain.setTargetAtTime(0,now,.6);}catch(e){}
+      try{if(n.osc)n.osc.stop(now+2);}catch(e){}
+      try{if(n.ns)n.ns.stop(now+2);}catch(e){}
+      try{if(n.lfo)n.lfo.stop(now+2);}catch(e){}
+    });
+    nodes=[];
+  }
+
+  return{
+    start(t){
+      if(!actx){
+        actx=new(window.AudioContext||window.webkitAudioContext)();
+        master=actx.createGain(); master.gain.value=0;
+        master.connect(actx.destination);
+      }
+      if(actx.state==='suspended') actx.resume();
+      gen++;
+      stopAll();
+      active=true; theme=t;
+      startLayers(t);
+      master.gain.setTargetAtTime(vol,actx.currentTime,1.0);
+      sched(gen);
+    },
+    stop(){
+      active=false; gen++;
+      if(!actx) return;
+      master.gain.setTargetAtTime(0,actx.currentTime,1.5);
+      setTimeout(stopAll,2500);
+    },
+    changeTheme(t){
+      if(active) this.start(t);
+    },
+    setVol(v){
+      vol=v;
+      if(master&&active) master.gain.setTargetAtTime(v,actx.currentTime,.2);
+    },
+  };
+})();
+
+// ═══════════════════════════════════════════
+//  컨트롤
+// ═══════════════════════════════════════════
+const sliderDensity=document.getElementById('slider-density');
+const sliderAmount =document.getElementById('slider-amount');
+const sliderPeaks  =document.getElementById('slider-peaks');
+const sliderSpeed  =document.getElementById('slider-speed');
+const sliderSpread =document.getElementById('slider-spread');
+const sliderDelay  =document.getElementById('slider-delay');
+const valDensity   =document.getElementById('val-density');
+const valAmount    =document.getElementById('val-amount');
+const valPeaks     =document.getElementById('val-peaks');
+const valSpeed     =document.getElementById('val-speed');
+const valSpread    =document.getElementById('val-spread');
+const valDelay     =document.getElementById('val-delay');
+const statsEl      =document.getElementById('stats');
+
+sliderDensity.addEventListener('input',()=>valDensity.textContent=sliderDensity.value);
+sliderAmount.addEventListener('input', ()=>valAmount.textContent=(parseInt(sliderAmount.value)/10).toFixed(1));
+sliderSpeed.addEventListener('input',  ()=>valSpeed.textContent=sliderSpeed.value);
+sliderSpread.addEventListener('input', ()=>valSpread.textContent=sliderSpread.value);
+sliderDelay.addEventListener('input',  ()=>valDelay.textContent=sliderDelay.value+'s');
+sliderPeaks.addEventListener('input',  ()=>{
+  valPeaks.textContent=sliderPeaks.value;
+  if(autoMode) rebuildEmitters();
+});
+document.getElementById('slider-vol').addEventListener('input',e=>{
+  Ambient.setVol(parseInt(e.target.value)/100);
+});
+
+let floorOpen=false;
+const btnFloor=document.getElementById('btn-floor');
+btnFloor.addEventListener('mousedown',  ()=>setFloor(true));
+btnFloor.addEventListener('touchstart', ()=>setFloor(true),{passive:true});
+btnFloor.addEventListener('mouseup',    ()=>setFloor(false));
+btnFloor.addEventListener('mouseleave', ()=>setFloor(false));
+btnFloor.addEventListener('touchend',   ()=>setFloor(false));
+function setFloor(v){floorOpen=v;btnFloor.classList.toggle('held',v);canWrap.classList.toggle('floor-open',v);}
+
+document.getElementById('btn-clear').addEventListener('click',()=>{
+  grid.fill(0);resetPhase='idle';autoFloorOpen=false;
+});
+document.getElementById('btn-spawn').addEventListener('click',()=>{
+  const raw=parseInt(sliderAmount.value)/10;
+  const n=(raw|0)+(Math.random()<(raw%1)?1:0)||1;
+  for(let i=0;i<n;i++){const x=(Math.random()*COLS)|0;const c=getSandColor(x);if(!grid[x])placeSand(x,0,packColor(c.r,c.g,c.b));}
+});
+
+let pDown=false;
+canvas.addEventListener('mousedown', e=>{pDown=true;addSandAt(e);});
+canvas.addEventListener('mousemove', e=>{if(pDown)addSandAt(e);});
+canvas.addEventListener('mouseup',   ()=>pDown=false);
+canvas.addEventListener('mouseleave',()=>pDown=false);
+canvas.addEventListener('touchstart',e=>{pDown=true;addSandAt(e.touches[0]);e.preventDefault();},{passive:false});
+canvas.addEventListener('touchmove', e=>{if(pDown)addSandAt(e.touches[0]);e.preventDefault();},{passive:false});
+canvas.addEventListener('touchend',  ()=>pDown=false);
+
+function addSandAt(e){
+  const rect=canvas.getBoundingClientRect();
+  const scaleX=canvas.width/rect.width, scaleY=canvas.height/rect.height;
+  const px=(((e.clientX-rect.left)*scaleX)/CELL)|0,py=(((e.clientY-rect.top)*scaleY)/CELL)|0;
+  if(px<0||px>=COLS||py<0||py>=ROWS) return;
+  const radius=Math.ceil(parseInt(sliderDensity.value)/2);
+  const raw=parseInt(sliderAmount.value)/10;
+  const amount=(raw|0)+(Math.random()<(raw%1)?1:0);
+  let placed=0;
+  for(let t=0;t<(amount+1)*4&&placed<amount;t++){
+    const ox=Math.round((Math.random()*2-1)*radius),oy=Math.round((Math.random()*2-1)*radius);
+    const nx=px+ox,ny=py+oy;
+    if(nx>=0&&nx<COLS&&ny>=0&&ny<ROWS&&!grid[ny*COLS+nx]){
+      const c=getSandColor(nx);placeSand(nx,ny,packColor(c.r,c.g,c.b));placed++;
+    }
+  }
+}
+function placeSand(x,y,color){if(x>=0&&x<COLS&&y>=0&&y<ROWS)grid[y*COLS+x]=color;}
+
+// ═══════════════════════════════════════════
+//  자동 산 모드
+// ═══════════════════════════════════════════
+let autoMode=false,emitters=[];
+document.getElementById('btn-auto').addEventListener('click',toggleAuto);
+function toggleAuto(){
+  autoMode=!autoMode;
+  const btn=document.getElementById('btn-auto');
+  btn.classList.toggle('auto-active',autoMode);
+  btn.textContent=autoMode?'⛰ 자동 산 ON':'⛰ 자동 산 OFF';
+  if(autoMode){ Ambient.start(currentTheme); rebuildEmitters(); }
+  else        { Ambient.stop(); emitters=[]; }
+}
+function calcDwell(){
+  const s=parseInt(sliderSpeed.value),base=Math.round(200-s*17);
+  return base+((Math.random()*base*.45)|0);
+}
+function rebuildEmitters(){
+  const n=parseInt(sliderPeaks.value),pal=getThemePal();
+  emitters=[];
+  for(let i=0;i<n;i++){
+    const jitter=(Math.random()-.5)*.7;
+    const cx=Math.round((i+.5+jitter)*COLS/n);
+    emitters.push({x:Math.min(COLS-1,Math.max(0,cx)),dwell:calcDwell(),ci:pal?i%pal.length:i});
+  }
+}
+function pickNewX(ei){
+  const others=emitters.map((e,i)=>i!==ei?e.x:-1).filter(v=>v>=0);
+  const gap=Math.max(3,(COLS/emitters.length)*.4)|0;
+  let nx,t=0;
+  do{nx=(Math.random()*COLS)|0;t++;}while(t<25&&others.some(ox=>Math.abs(nx-ox)<gap));
+  return nx;
+}
+function updateAutoEmitters(){
+  if(!autoMode||!emitters.length) return;
+  const spread=parseInt(sliderSpread.value);
+  const raw=parseInt(sliderAmount.value)/10;
+  const amount=(raw|0)+(Math.random()<(raw%1)?1:0);
+  for(let i=0;i<emitters.length;i++){
+    const em=emitters[i];
+    for(let k=0;k<amount;k++){
+      const ox=spread===0?0:Math.round((Math.random()*2-1)*spread);
+      const x=Math.min(COLS-1,Math.max(0,em.x+ox));
+      if(!grid[x]){const c=getEmitterColor(em,x);placeSand(x,0,packColor(c.r,c.g,c.b));}
+    }
+    em.dwell--;
+    if(em.dwell<=0){
+      em.x=pickNewX(i);em.dwell=calcDwell();
+      const pal=getThemePal();if(pal)em.ci=(em.ci+1)%pal.length;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════
+//  자동 초기화
+// ═══════════════════════════════════════════
+let autoReset=false,showMessage=true;
+let resetPhase='idle',resetTimerEnd=0,autoFloorOpen=false;
+const DRAIN_MS=3000;
+
+document.getElementById('btn-autoreset').addEventListener('click',()=>{
+  autoReset=!autoReset;
+  const b=document.getElementById('btn-autoreset');
+  b.classList.toggle('on',autoReset);
+  b.textContent=autoReset?'🔄 자동초기화 ON':'🔄 자동초기화 OFF';
+  if(!autoReset){resetPhase='idle';autoFloorOpen=false;}
+});
+document.getElementById('btn-countdown').addEventListener('click',()=>{
+  showMessage=!showMessage;
+  const b=document.getElementById('btn-countdown');
+  b.classList.toggle('on',showMessage);
+  b.textContent=showMessage?'💬 메시지 표시 ON':'💬 메시지 표시 OFF';
+});
+
+function checkFull(){
+  if(!autoReset||resetPhase!=='idle') return;
+  for(let x=0;x<COLS;x++) if(!grid[5*COLS+x]) return; // y=5 행 체크
+  resetPhase='countdown';
+  resetTimerEnd=Date.now()+parseInt(sliderDelay.value)*1000;
+}
+function tickAutoReset(){
+  if(!autoReset||resetPhase==='idle') return;
+  const now=Date.now();
+  if(resetPhase==='countdown'){
+    if(now>=resetTimerEnd){resetPhase='draining';resetTimerEnd=now+DRAIN_MS;autoFloorOpen=true;}
+  } else if(resetPhase==='draining'){
+    if(now>=resetTimerEnd){grid.fill(0);autoFloorOpen=false;resetPhase='idle';}
+  }
+}
+
+// ═══════════════════════════════════════════
+//  물리
+// ═══════════════════════════════════════════
+let tick=0;
+function update(){
+  tick++;const lf=tick%2===0;
+  updateAutoEmitters();
+  tickAutoReset();
+  checkFull();
+  if(floorOpen||autoFloorOpen) for(let x=0;x<COLS;x++) grid[(ROWS-1)*COLS+x]=0;
+  for(let y=ROWS-2;y>=0;y--){
+    for(let xi=0;xi<COLS;xi++){
+      const x=lf?xi:COLS-1-xi,idx=y*COLS+x;
+      if(!grid[idx])continue;
+      const bel=(y+1)*COLS+x;
+      if(!grid[bel]){grid[bel]=grid[idx];grid[idx]=0;continue;}
+      const gl=Math.random()<.5;
+      for(const dx of[gl?-1:1,gl?1:-1]){
+        const nx=x+dx;
+        if(nx>=0&&nx<COLS&&!grid[(y+1)*COLS+nx]){grid[(y+1)*COLS+nx]=grid[idx];grid[idx]=0;break;}
+      }
+    }
+  }
+}
+
+// ═══════════════════════════════════════════
+//  렌더링
+// ═══════════════════════════════════════════
+function render(){
+  const W=canvas.width,dv=new Uint32Array(pixels.buffer);
+  dv.fill(packColor(0x1a,0x1a,0x2e));
+  let sandCount=0;
+  for(let gy=0;gy<ROWS;gy++){
+    for(let gx=0;gx<COLS;gx++){
+      const color=grid[gy*COLS+gx];
+      if(!color)continue; sandCount++;
+      for(let py=0;py<CELL;py++){
+        const row=(gy*CELL+py)*W+gx*CELL;
+        for(let px=0;px<CELL;px++) dv[row+px]=color;
+      }
+    }
+  }
+  ctx.putImageData(imageData,0,0);
+
+  if(autoMode){
+    emitters.forEach(em=>{
+      const px=em.x*CELL+CELL/2,col=indicatorHex(em);
+      ctx.save();ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=9;
+      ctx.beginPath();ctx.moveTo(px,2);ctx.lineTo(px-4,11);ctx.lineTo(px+4,11);
+      ctx.closePath();ctx.fill();ctx.restore();
+    });
+  }
+
+  if(autoReset&&showMessage&&resetPhase!=='idle'){
+    const msg=resetPhase==='countdown'
+      ?`초기화까지 ${Math.ceil((resetTimerEnd-Date.now())/1000)}초`:'배출 중…';
+    ctx.save();
+    ctx.fillStyle='rgba(0,0,0,.65)';
+    ctx.beginPath();
+    if(ctx.roundRect)ctx.roundRect(W/2-72,4,144,26,5); else ctx.rect(W/2-72,4,144,26);
+    ctx.fill();
+    ctx.font='bold 12px monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=resetPhase==='countdown'?'#ff9090':'#88aaff';
+    ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=6;
+    ctx.fillText(msg,W/2,17);
+    ctx.restore();
+  }
+
+  statsEl.textContent='모래: '+sandCount.toLocaleString();
+}
+
+// ═══════════════════════════════════════════
+//  메인 루프
+// ═══════════════════════════════════════════
+let lastTime=0;
+function loop(ts){
+  requestAnimationFrame(loop);
+  if(ts-lastTime<16) return;
+  lastTime=ts;
+  update(); render();
+}
+resize();
+window.addEventListener('resize',()=>{ if(!document.fullscreenElement&&!fsTransition) resize(); });
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

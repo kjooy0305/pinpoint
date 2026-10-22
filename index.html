@@ -1,23 +1,520 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pinpoint</title>
+  <link rel="stylesheet" href="assets/css/style.css">
   <style>
-    html, body { height: 100%; margin: 0; }
-    body {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: system-ui, -apple-system, "Noto Sans KR", sans-serif;
-      background: #f5f6f8;
-      color: #222;
+    /* ── 카테고리 3줄 ── */
+    .cat-list { padding: 12px 16px 0; display: flex; flex-direction: column; gap: 8px; }
+    .cat-item {
+      display: flex; align-items: center; gap: 14px;
+      width: 100%; padding: 14px 16px;
+      background: #fff; border: 2px solid #e4e6ea; border-radius: 16px;
+      cursor: pointer; text-align: left; transition: border-color .12s, background .12s, transform .1s;
     }
-    h1 { font-size: 2rem; font-weight: 600; padding: 0 16px; text-align: center; }
+    .cat-item:hover { background: #f8f9ff; }
+    .cat-item:active { transform: scale(.985); }
+    .cat-item.active-docs { border-color: #3b5bdb; background: #f0f3ff; }
+    .cat-item.active-game { border-color: #e8590c; background: #fff5eb; }
+    .cat-item.active-exp { border-color: #0ca678; background: #ebfbee; }
+    .cat-icon {
+      width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 22px;
+    }
+    .cat-docs .cat-icon { background: #dbe4ff; }
+    .cat-game .cat-icon { background: #ffe8cc; }
+    .cat-exp .cat-icon { background: #c3fae8; }
+    .cat-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+    .cat-label { font-size: 16px; font-weight: 800; color: #111; }
+    .cat-desc { font-size: 12px; color: #999; }
+    .cat-count { font-size: 13px; font-weight: 800; color: #fff; background: #adb5bd; border-radius: 20px; padding: 2px 10px; flex-shrink: 0; }
+    .cat-docs .cat-count { background: #3b5bdb; }
+    .cat-game .cat-count { background: #e8590c; }
+    .cat-exp .cat-count { background: #0ca678; }
+    .cat-chevron { font-size: 20px; color: #ccc; flex-shrink: 0; }
+
+    /* ── 검색 ── */
+    .search-wrap { padding: 12px 16px 0; position: sticky; top: 0; z-index: 5; }
+    .search-box {
+      display: flex; align-items: center; gap: 8px;
+      background: #fff; border: 1px solid #e4e6ea; border-radius: 12px;
+      padding: 10px 14px;
+    }
+    .search-box .s-icon { font-size: 16px; color: #999; }
+    #search-input {
+      flex: 1; border: none; outline: none; font-size: 15px; background: transparent; color: #111;
+    }
+    #search-clear {
+      border: none; background: #f1f3f5; width: 22px; height: 22px; border-radius: 50%;
+      cursor: pointer; font-size: 13px; color: #666; display: none; line-height: 1;
+    }
+
+    /* ── 현재 필터 바 ── */
+    .filter-bar { padding: 10px 16px 0; display: none; align-items: center; gap: 8px; }
+    .filter-bar.show { display: flex; }
+    .filter-tag {
+      font-size: 13px; font-weight: 700; background: #111; color: #fff;
+      border-radius: 20px; padding: 5px 12px;
+    }
+    .filter-reset {
+      font-size: 13px; font-weight: 600; background: #fff; border: 1px solid #e4e6ea;
+      border-radius: 20px; padding: 5px 12px; cursor: pointer; color: #555;
+    }
+    .filter-reset:hover { background: #f1f3f5; }
+    .list-meta { padding: 10px 20px 0; font-size: 12px; color: #999; }
+
+    /* ── 설정 토글 ── */
+    .settings-btn {
+      position: fixed; top: 14px; right: 16px; z-index: 20;
+      width: 38px; height: 38px; border-radius: 50%;
+      background: #fff; border: 1px solid #e4e6ea;
+      font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      transition: background .12s;
+    }
+    .settings-btn:hover { background: #f1f3f5; }
+
+    /* ── 설정 패널 ── */
+    .settings-panel {
+      position: fixed; top: 60px; right: 16px; z-index: 20;
+      background: #fff; border-radius: 14px; border: 1px solid #e4e6ea;
+      box-shadow: 0 8px 30px rgba(0,0,0,.12);
+      padding: 16px; width: 240px;
+      display: none;
+    }
+    .settings-panel.open { display: block; }
+    .settings-panel h3 { font-size: 14px; font-weight: 700; color: #111; margin-bottom: 12px; }
+    .setting-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 0; font-size: 13px; color: #333;
+    }
+    .setting-row + .setting-row { border-top: 1px solid #f1f3f5; }
+    .toggle-switch {
+      position: relative; width: 40px; height: 22px;
+      background: #dee2e6; border-radius: 20px; cursor: pointer;
+      transition: background .2s; flex-shrink: 0;
+    }
+    .toggle-switch.on { background: #3b5bdb; }
+    .toggle-switch::after {
+      content: ''; position: absolute; top: 3px; left: 3px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #fff; transition: transform .2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+    .toggle-switch.on::after { transform: translateX(18px); }
+
+    /* ── 카테고리 뷰 ── */
+    .cat-view-header {
+      position: sticky; top: 0; z-index: 10;
+      background: #fff; border-bottom: 1px solid #e4e6ea;
+      padding: 0 16px; height: 56px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .cat-view-title { font-size: 17px; font-weight: 700; color: #111; flex: 1; }
+    .cat-view-search {
+      padding: 10px 16px 0; position: sticky; top: 56px; z-index: 5;
+      background: #fff;
+    }
   </style>
 </head>
 <body>
-  <h1>테스트 중입니다</h1>
+
+<!-- ── 홈 뷰 ──────────────────────────────── -->
+<div class="view" id="view-home">
+  <div class="home-header">
+    <h1>Pinpoint</h1>
+    <p>플레이할 게임을 선택하세요</p>
+  </div>
+
+  <!-- 카테고리 3줄 바로가기 -->
+  <div class="cat-list" id="cat-list">
+    <button class="cat-item cat-docs" data-cat="docs">
+      <div class="cat-icon">📚</div>
+      <div class="cat-info">
+        <span class="cat-label">자료 정리 모음</span>
+        <span class="cat-desc">가이드 · 레퍼런스 · 백과사전</span>
+      </div>
+      <span class="cat-count" id="count-docs">0</span>
+      <span class="cat-chevron">›</span>
+    </button>
+    <button class="cat-item cat-game" data-cat="game">
+      <div class="cat-icon">🎮</div>
+      <div class="cat-info">
+        <span class="cat-label">게임 모음</span>
+        <span class="cat-desc">플레이 가능한 게임들</span>
+      </div>
+      <span class="cat-count" id="count-game">0</span>
+      <span class="cat-chevron">›</span>
+    </button>
+    <button class="cat-item cat-exp" data-cat="exp">
+      <div class="cat-icon">✨</div>
+      <div class="cat-info">
+        <span class="cat-label">체험 요소 모음</span>
+        <span class="cat-desc">시뮬레이션 · 도구 · 인터랙션</span>
+      </div>
+      <span class="cat-count" id="count-exp">0</span>
+      <span class="cat-chevron">›</span>
+    </button>
+  </div>
+
+  <!-- 검색 -->
+  <div class="search-wrap">
+    <div class="search-box">
+      <span class="s-icon">🔍</span>
+      <input id="search-input" type="text" placeholder="이름 또는 번호로 검색 (예: 미로, 42, KaTeX)" autocomplete="off">
+      <button id="search-clear" title="지우기">✕</button>
+    </div>
+  </div>
+
+  <!-- 현재 필터 표시 -->
+  <div class="filter-bar" id="filter-bar">
+    <span class="filter-tag" id="filter-tag"></span>
+    <button class="filter-reset" id="filter-reset">✕ 전체 보기</button>
+  </div>
+
+  <div class="list-meta" id="list-meta"></div>
+  <div class="btn-list" id="btn-list"></div>
+</div>
+
+<!-- ── 카테고리 뷰 ──────────────────────────── -->
+<div class="view" id="view-category">
+  <div class="cat-view-header">
+    <button class="back-btn" id="cat-back-btn">‹</button>
+    <span class="cat-view-title" id="cat-view-title"></span>
+  </div>
+  <div class="cat-view-search">
+    <div class="search-box">
+      <span class="s-icon">🔍</span>
+      <input id="cat-search-input" type="text" placeholder="이 카테고리 내 검색..." autocomplete="off">
+      <button id="cat-search-clear" title="지우기">✕</button>
+    </div>
+  </div>
+  <div class="list-meta" id="cat-list-meta"></div>
+  <div class="btn-list" id="cat-btn-list"></div>
+</div>
+
+<!-- ── 상세 뷰 ─────────────────────────────── -->
+<div class="view" id="view-detail">
+  <div class="detail-header">
+    <button class="back-btn" id="back-btn">‹</button>
+    <span class="detail-title" id="detail-title"></span>
+  </div>
+  <div class="detail-content" id="detail-content"></div>
+</div>
+
+<!-- ── 설정 버튼 & 패널 ──────────────────── -->
+<button class="settings-btn" id="settings-btn">⚙️</button>
+<div class="settings-panel" id="settings-panel">
+  <h3>설정</h3>
+  <div class="setting-row">
+    <span>전체 100칸 표시</span>
+    <div class="toggle-switch" id="toggle-all"></div>
+  </div>
+</div>
+
+<!-- 페이지 설정 로드 -->
+<script src="data/pages.js"></script>
+
+<script>
+  const MAX_N = 100;
+
+  // ── 카테고리 분류 ─────────────────────
+  // data/pages.js 의 각 항목 cat('docs'|'game'|'exp')으로 분류. 없으면 docs
+  const CAT_GAME = new Set([]);
+  const CAT_EXP  = new Set([]);
+  // 나머지는 전부 docs
+  const CAT_LABEL = { docs: '자료 정리 모음', game: '게임 모음', exp: '체험 요소 모음' };
+
+  function getCat(n) {
+    const p = (typeof PAGES !== 'undefined' && PAGES[n]) || {};
+    if (p.cat === 'docs' || p.cat === 'game' || p.cat === 'exp') return p.cat;
+    if (CAT_GAME.has(n)) return 'game';
+    if (CAT_EXP.has(n)) return 'exp';
+    return 'docs';
+  }
+
+  function getItem(n) {
+    const page  = (typeof PAGES !== 'undefined' && PAGES[n]) || {};
+    return {
+      n,
+      label: page.label || `빈 칸 ${n}`,
+      desc: page.desc || '',
+      thumb: page.thumb || null,
+      url: page.url || null,
+      cat: getCat(n),
+      hasContent: !!page.url,
+    };
+  }
+
+  // 전체 1~MAX_N 아이템 미리 생성
+  const ALL = [];
+  for (let i = 1; i <= MAX_N; i++) ALL.push(getItem(i));
+
+  // 카테고리 개수 표시 (내용 있는 것만 집계)
+  function updateCounts() {
+    const c = { docs: 0, game: 0, exp: 0 };
+    ALL.forEach(it => { if (it.hasContent) c[it.cat]++; });
+    document.getElementById('count-docs').textContent = c.docs;
+    document.getElementById('count-game').textContent = c.game;
+    document.getElementById('count-exp').textContent = c.exp;
+  }
+
+  // ── 상태 & 렌더 ───────────────────────
+  let activeCat = null; // null | 'docs' | 'game' | 'exp'
+  let query = '';
+  let catQuery = '';
+  let showAllSlots = localStorage.getItem('pinpoint-showall') !== 'false';
+
+  const listEl = document.getElementById('btn-list');
+  const metaEl = document.getElementById('list-meta');
+  const filterBar = document.getElementById('filter-bar');
+  const filterTag = document.getElementById('filter-tag');
+  const searchInput = document.getElementById('search-input');
+  const searchClear = document.getElementById('search-clear');
+
+  const catListEl = document.getElementById('cat-btn-list');
+  const catMetaEl = document.getElementById('cat-list-meta');
+  const catSearchInput = document.getElementById('cat-search-input');
+  const catSearchClear = document.getElementById('cat-search-clear');
+
+  function matchesQuery(it, q) {
+    if (!q) return true;
+    q = q.trim().toLowerCase();
+    if (!q) return true;
+    const qNum = q.replace(/^(테스트|test|#)\s*/i, '');
+    if (String(it.n) === qNum) return true;
+    if (String(it.n).includes(qNum) && /^\d+$/.test(qNum)) return true;
+    return it.label.toLowerCase().includes(q) || (it.desc || '').toLowerCase().includes(q);
+  }
+
+  function createItemBtn(it, showBadge) {
+    const thumbHtml = it.thumb
+      ? `<div class="btn-thumb"><img src="${it.thumb}" alt="${it.label}"></div>`
+      : `<div class="btn-thumb"><span class="btn-num">${it.n}</span></div>`;
+    const badge = showBadge
+      ? `<span class="btn-desc">[${CAT_LABEL[it.cat].replace(' 모음','')}] ${it.desc || ''}</span>`
+      : (it.desc ? `<span class="btn-desc">${it.desc}</span>` : '');
+    const btn = document.createElement('button');
+    btn.className = 'btn-item';
+    btn.innerHTML =
+      thumbHtml +
+      `<div class="btn-info">
+          <span class="btn-label">${it.n}. ${it.label}</span>
+          ${badge}
+        </div>` +
+      `<span class="btn-chevron">›</span>`;
+    btn.addEventListener('click', () => { location.hash = it.n; });
+    return btn;
+  }
+
+  function renderList() {
+    listEl.innerHTML = '';
+    const q = query.trim();
+    let items = ALL.filter(it => (!activeCat || it.cat === activeCat) && matchesQuery(it, q));
+    items.sort((a, b) => a.n - b.n);
+    if (!showAllSlots) items = items.filter(it => it.hasContent);
+
+    if (activeCat) {
+      filterBar.classList.add('show');
+      filterTag.textContent = CAT_LABEL[activeCat];
+    } else {
+      filterBar.classList.remove('show');
+    }
+
+    document.querySelectorAll('.cat-item').forEach(btn => {
+      btn.classList.remove('active-docs', 'active-game', 'active-exp');
+      if (btn.dataset.cat === activeCat) btn.classList.add('active-' + activeCat);
+    });
+
+    const total = ALL.filter(it => !activeCat || it.cat === activeCat).length;
+    const withContent = items.length;
+    if (q) {
+      metaEl.textContent = `"${query.trim()}" 검색 결과 ${withContent}개` + (activeCat ? ` (${CAT_LABEL[activeCat]} 내)` : ' (전체 100개 중)');
+    } else if (activeCat) {
+      metaEl.textContent = `${CAT_LABEL[activeCat]} — ${items.filter(i=>i.hasContent).length}개 (전체 ${total}칸 중)`;
+    } else {
+      const filled = ALL.filter(i=>i.hasContent).length;
+      metaEl.textContent = `전체 ${filled}개 등록됨 (100칸 중) — 위 3줄에서 주제별로 모아보기`;
+    }
+
+    if (items.length === 0) {
+      listEl.innerHTML = `<div class="empty-msg" style="padding:40px 0;"><span class="icon">🔍</span><p>검색 결과가 없습니다</p></div>`;
+      return;
+    }
+
+    items.forEach(it => listEl.appendChild(createItemBtn(it, !activeCat)));
+  }
+
+  function renderCatList() {
+    if (!activeCat) return;
+    catListEl.innerHTML = '';
+    const q = catQuery.trim();
+    let items = ALL.filter(it => it.cat === activeCat && matchesQuery(it, q));
+    items.sort((a, b) => a.n - b.n);
+    if (!showAllSlots) items = items.filter(it => it.hasContent);
+
+    const totalInCat = ALL.filter(it => it.cat === activeCat).length;
+    const filledInCat = items.filter(i => i.hasContent).length;
+    if (q) {
+      catMetaEl.textContent = `"${catQuery.trim()}" 검색 결과 ${items.length}개 (전체 ${totalInCat}칸 중)`;
+    } else {
+      catMetaEl.textContent = `${CAT_LABEL[activeCat]} — ${filledInCat}개 등록됨 (전체 ${totalInCat}칸 중)`;
+    }
+
+    if (items.length === 0) {
+      catListEl.innerHTML = `<div class="empty-msg" style="padding:40px 0;"><span class="icon">🔍</span><p>검색 결과가 없습니다</p></div>`;
+      return;
+    }
+
+    items.forEach(it => catListEl.appendChild(createItemBtn(it, false)));
+  }
+
+  function switchToCatView(cat) {
+    activeCat = cat;
+    catQuery = '';
+    catSearchInput.value = '';
+    catSearchClear.style.display = 'none';
+    document.getElementById('cat-view-title').textContent = CAT_LABEL[cat];
+    document.getElementById('view-category').classList.add('active');
+    document.getElementById('view-home').classList.remove('active');
+    renderCatList();
+  }
+
+  function switchToHome() {
+    activeCat = null;
+    document.getElementById('view-home').classList.add('active');
+    document.getElementById('view-category').classList.remove('active');
+    renderList();
+  }
+
+  document.querySelectorAll('.cat-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      switchToCatView(btn.dataset.cat);
+    });
+  });
+
+  document.getElementById('cat-back-btn').addEventListener('click', switchToHome);
+
+  document.getElementById('filter-reset').addEventListener('click', () => {
+    activeCat = null;
+    renderList();
+  });
+
+  // ── 홈 검색 ──
+  let searchTimer = null;
+  searchInput.addEventListener('input', () => {
+    searchClear.style.display = searchInput.value ? 'block' : 'none';
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { query = searchInput.value; renderList(); }, 120);
+  });
+  searchClear.addEventListener('click', () => {
+    searchInput.value = '';
+    query = '';
+    searchClear.style.display = 'none';
+    renderList();
+    searchInput.focus();
+  });
+
+  // ── 카테고리 검색 ──
+  let catSearchTimer = null;
+  catSearchInput.addEventListener('input', () => {
+    catSearchClear.style.display = catSearchInput.value ? 'block' : 'none';
+    clearTimeout(catSearchTimer);
+    catSearchTimer = setTimeout(() => { catQuery = catSearchInput.value; renderCatList(); }, 120);
+  });
+  catSearchClear.addEventListener('click', () => {
+    catSearchInput.value = '';
+    catQuery = '';
+    catSearchClear.style.display = 'none';
+    renderCatList();
+    catSearchInput.focus();
+  });
+
+  // ── 설정 ──
+  const settingsBtn = document.getElementById('settings-btn');
+  const settingsPanel = document.getElementById('settings-panel');
+  const toggleAll = document.getElementById('toggle-all');
+
+  function updateToggleUI() {
+    toggleAll.classList.toggle('on', showAllSlots);
+  }
+  updateToggleUI();
+
+  settingsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    settingsPanel.classList.toggle('open');
+  });
+  document.addEventListener('click', (e) => {
+    if (!settingsPanel.contains(e.target) && e.target !== settingsBtn) {
+      settingsPanel.classList.remove('open');
+    }
+  });
+  toggleAll.addEventListener('click', () => {
+    showAllSlots = !showAllSlots;
+    localStorage.setItem('pinpoint-showall', showAllSlots);
+    updateToggleUI();
+    if (activeCat) renderCatList();
+    else renderList();
+  });
+
+  // ── 뒤로가기 ──────────────────────────────
+  document.getElementById('back-btn').addEventListener('click', () => {
+    location.hash = '';
+  });
+
+  // ── 라우터 ────────────────────────────────
+  function render() {
+    const n = parseInt(location.hash.replace('#', ''));
+    const isDetail = n >= 1 && n <= MAX_N;
+
+    document.getElementById('view-detail').classList.toggle('active', isDetail);
+
+    if (!isDetail) {
+      if (location.hash && location.hash !== '') {
+        const nn = parseInt(location.hash.replace('#', ''));
+        if (nn >= 1 && nn <= MAX_N) history.replaceState(null, '', location.pathname);
+      }
+      document.title = 'Pinpoint';
+      if (activeCat) {
+        document.getElementById('view-category').classList.add('active');
+        document.getElementById('view-home').classList.remove('active');
+      } else {
+        document.getElementById('view-home').classList.add('active');
+        document.getElementById('view-category').classList.remove('active');
+      }
+      return;
+    }
+
+    document.getElementById('view-home').classList.remove('active');
+    document.getElementById('view-category').classList.remove('active');
+
+    const page  = PAGES[n] || {};
+    const label = page.label || `빈 칸 ${n}`;
+
+    document.getElementById('detail-title').textContent = `${n}. ${label}`;
+    document.title = `${label} — Pinpoint`;
+
+    const content = document.getElementById('detail-content');
+    if (page.url) {
+      content.innerHTML =
+        `<iframe class="detail-iframe" src="${page.url}" allowfullscreen
+         allow="microphone; camera; clipboard-write; fullscreen"></iframe>`;
+    } else {
+      content.innerHTML =
+        `<div class="empty-msg">
+           <span class="icon">🧪</span>
+           <p>아직 내용이 없습니다</p>
+         </div>`;
+    }
+  }
+
+  window.addEventListener('hashchange', render);
+  updateCounts();
+  renderList();
+  render();
+</script>
 </body>
 </html>
